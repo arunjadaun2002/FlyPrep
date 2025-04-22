@@ -1,0 +1,690 @@
+.container {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 80px auto 0;
+  min-height: calc(100vh - 80px);
+}
+
+.setupCard {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.title {
+  font-size: 2rem;
+  color: #333;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.nameForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.nameInput {
+  width: 100%;
+  max-width: 300px;
+  padding: 0.8rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.submitButton {
+  background: #4C6EF5;
+  color: white;
+  padding: 0.8rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.submitButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 110, 245, 0.2);
+}
+
+.setupForm {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.formGroup {
+  text-align: center;
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.formGroup label {
+  display: block;
+  font-size: 1.1rem;
+  color: #333;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+.participantSelector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.participantSelector button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #4C6EF5;
+  background: white;
+  color: #4C6EF5;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.participantSelector button:hover:not(:disabled) {
+  background: #4C6EF5;
+  color: white;
+}
+
+.participantSelector button:disabled {
+  border-color: #ccc;
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+.participantSelector span {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #333;
+  min-width: 40px;
+  text-align: center;
+}
+
+.topicTypeSelect,
+.durationSelect {
+  width: 200px;
+  padding: 0.8rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+  cursor: pointer;
+  background: #f8f9fa;
+  color: #333;
+  transition: all 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234C6EF5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 1.2rem;
+  padding-right: 2.5rem;
+}
+
+.topicTypeSelect:hover,
+.durationSelect:hover {
+  border-color: #4C6EF5;
+  background-color: #fff;
+}
+
+.topicTypeSelect:focus,
+.durationSelect:focus {
+  outline: none;
+  border-color: #4C6EF5;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.1);
+}
+
+.topicTypeSelect option,
+.durationSelect option {
+  background: #fff;
+  color: #333;
+  padding: 0.8rem;
+}
+
+.selectedTopic {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  font-size: 1.1rem;
+  color: #4C6EF5;
+  text-align: center;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #e9ecef;
+}
+
+.refreshButton {
+  background: transparent;
+  border: none;
+  color: #4C6EF5;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 auto;
+}
+
+.refreshButton:hover {
+  background: rgba(76, 110, 245, 0.1);
+}
+
+.joinCreateSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.joinSection,
+.createSection {
+  padding: 2rem;
+  border-radius: 12px;
+  background: #f8f9fa;
+  text-align: center;
+}
+
+.joinSection h2,
+.createSection h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.roomInput {
+  width: 100%;
+  padding: 0.8rem;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.joinButton,
+.createButton,
+.startButton {
+  width: 100%;
+  padding: 1rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.joinButton {
+  background: #4C6EF5;
+  color: white;
+}
+
+.createButton {
+  background: #40C057;
+  color: white;
+}
+
+.startButton {
+  background: #4C6EF5;
+  color: white;
+  margin-top: 1rem;
+}
+
+.joinButton:hover,
+.createButton:hover,
+.startButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.joinButton:disabled,
+.startButton:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Discussion Room Styles */
+.discussionRoom {
+  width: 100%;
+  height: calc(100vh - 120px);
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.roomInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.roomSideDisplay {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(76, 110, 245, 0.95);
+  padding: 1.5rem;
+  border-radius: 12px 0 0 12px;
+  color: white;
+  box-shadow: -4px 0 20px rgba(76, 110, 245, 0.2);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+.roomSideDisplay:hover {
+  transform: translateY(-50%) translateX(-5px);
+  box-shadow: -6px 0 25px rgba(76, 110, 245, 0.3);
+}
+
+.roomIdLabel {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.9;
+}
+
+.roomIdValue {
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.roomIdValue:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.copyIndicator {
+  font-size: 0.8rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.copyIndicator.visible {
+  opacity: 1;
+}
+
+.roomDetails {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.roomDetails h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.roomIcon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(76, 110, 245, 0.1);
+  border-radius: 50%;
+  color: #4C6EF5;
+}
+
+.adminBadge {
+  background: #4C6EF5;
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.timer {
+  font-size: 1.2rem;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.prepTimer, .discussionTimer {
+  color: #f59f0a;
+  background: rgba(245, 159, 10, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.discussionTimer {
+  color: #4C6EF5;
+  background: rgba(76, 110, 245, 0.1);
+}
+
+.startMessage {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(56, 161, 105, 0.9);
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: 500;
+  z-index: 1000;
+  animation: fadeInOut 3s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+
+.discussionLayout {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2rem 0;
+}
+
+.topic {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(76, 110, 245, 0.1);
+  padding: 1.5rem;
+  border-radius: 50%;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  z-index: 1;
+}
+
+.topic h3 {
+  color: #4C6EF5;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.participantsCircle {
+  position: relative;
+  width: 80%;
+  height: 80%;
+  max-width: 800px;
+  max-height: 800px;
+  margin: auto;
+}
+
+.participantContainer {
+  position: absolute;
+  width: 220px;
+  height: 165px;
+  top: 50%;
+  left: 50%;
+  margin: -82.5px 0 0 -110px;
+  transform-origin: 110px 82.5px;
+}
+
+.videoWrapper {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8f9fa;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.videoWrapper:hover {
+  transform: scale(1.05);
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mockVideo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #e9ecef;
+}
+
+.mockVideo span {
+  font-size: 2rem;
+}
+
+.participantName {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.8rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.videoControls {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  display: flex;
+  gap: 0.8rem;
+}
+
+.controlButton {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.2s;
+  font-size: 1.2rem;
+}
+
+.controlButton:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+.controlButton.active {
+  background: #4C6EF5;
+}
+
+.roomHeader {
+  margin-bottom: 2rem;
+}
+
+.roomTitle {
+  font-size: 1.8rem;
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.topicBox {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+.topicBox h3 {
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.topicBox p {
+  color: #666;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.videoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.videoContainer {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.videoControls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.controlButton {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.controlButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.controlButton.active {
+  background: #4C6EF5;
+}
+
+.participantsList {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.participantsList h3 {
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.participantsList ul {
+  list-style: none;
+  padding: 0;
+}
+
+.participantsList li {
+  padding: 0.5rem 0;
+  color: #666;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.participantsList li:last-child {
+  border-bottom: none;
+}
+
+.discussionCard {
+  text-align: center;
+}
+
+.topicDisplay {
+  background: #f8f9fa;
+  padding: 2rem;
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+.topicDisplay h3 {
+  color: #333;
+  margin-bottom: 1rem;
+}
+
+.topicDisplay p {
+  color: #666;
+  font-size: 1.2rem;
+  line-height: 1.6;
+} 

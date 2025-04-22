@@ -1,0 +1,90 @@
+.dashboard {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 80px auto 0;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.title {
+  text-align: center;
+  font-size: 3rem;
+  color: #1a1a1a;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 4rem;
+}
+
+.optionsContainer {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+  padding: 2rem;
+}
+
+.option {
+  background: linear-gradient(135deg, #4C6EF5 0%, #364FC7 100%);
+  border-radius: 16px;
+  padding: 2.5rem;
+  width: 320px;
+  height: 240px;
+  text-decoration: none;
+  color: white;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.option::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #364FC7 0%, #4C6EF5 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.option:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(76, 110, 245, 0.3);
+}
+
+.option:hover::before {
+  opacity: 1;
+}
+
+.optionContent {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.optionContent h2 {
+  font-size: 2rem;
+  color: white;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.optionContent p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  line-height: 1.6;
+  max-width: 80%;
+} 
