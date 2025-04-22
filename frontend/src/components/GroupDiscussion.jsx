@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createRoom, getRoom, joinRoom, updateParticipant } from '../services/api';
+import { socketService } from '../services/socket';
 import styles from './GroupDiscussion.module.css';
 
 const TOPIC_TYPES = {
@@ -79,6 +81,11 @@ const GroupDiscussion = () => {
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [showCopyIndicator, setShowCopyIndicator] = useState(false);
+  const [isWaitingForMembers, setIsWaitingForMembers] = useState(true);
+  const [inviteTimer, setInviteTimer] = useState(300); // 5 minutes for invite expiry
+  const [showInviteExpired, setShowInviteExpired] = useState(false);
+  const [error, setError] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('disconnected');
 
   useEffect(() => {
     if (isAdmin) {
@@ -122,6 +129,59 @@ const GroupDiscussion = () => {
     return () => clearInterval(interval);
   }, [isTimerRunning, discussionTimer]);
 
+  // Add invite timer effect
+  useEffect(() => {
+    let interval;
+    if (isWaitingForMembers && inviteTimer > 0) {
+      interval = setInterval(() => {
+        setInviteTimer(prev => prev - 1);
+      }, 1000);
+    } else if (inviteTimer === 0) {
+      setShowInviteExpired(true);
+      // Handle invite expiry - could redirect or reset
+    }
+    return () => clearInterval(interval);
+  }, [isWaitingForMembers, inviteTimer]);
+
+  // Check if all members have joined
+  useEffect(() => {
+    if (step === 4) {
+      setIsWaitingForMembers(participants.length < maxParticipants);
+    }
+  }, [participants.length, maxParticipants, step]);
+
+  useEffect(() => {
+    const handleConnectionStatus = (data) => {
+      setConnectionStatus(data.status);
+    };
+
+    const handleParticipantJoined = (data) => {
+      setParticipants(prev => [...prev, data.participant]);
+    };
+
+    const handleParticipantLeft = (data) => {
+      setParticipants(prev => prev.filter(p => p.id !== data.participantId));
+    };
+
+    const handleDiscussionStart = () => {
+      setIsPreparing(true);
+      setIsWaitingForMembers(false);
+    };
+
+    socketService.on('connection', handleConnectionStatus);
+    socketService.on('participant_joined', handleParticipantJoined);
+    socketService.on('participant_left', handleParticipantLeft);
+    socketService.on('discussion_start', handleDiscussionStart);
+
+    return () => {
+      socketService.off('connection', handleConnectionStatus);
+      socketService.off('participant_joined', handleParticipantJoined);
+      socketService.off('participant_left', handleParticipantLeft);
+      socketService.off('discussion_start', handleDiscussionStart);
+      socketService.disconnect();
+    };
+  }, []);
+
   const initializeStream = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -155,25 +215,73 @@ const GroupDiscussion = () => {
     }
   };
 
-  const handleJoinRoom = () => {
-    if (inputRoomId.trim()) {
-      setRoomId(inputRoomId.trim().toUpperCase());
-      initializeStream();
-      setParticipants(prev => [...prev, { id: Date.now(), name, isLocal: true }]);
-      setStep(4);
+  const handleJoinRoom = async () => {
+    try {
+      setError(null);
+      if (inputRoomId.trim()) {
+        const roomDetails = await getRoom(inputRoomId.trim().toUpperCase());
+        if (roomDetails.participants.length >= roomDetails.maxParticipants) {
+          throw new Error('Room is full');
+        }
+        
+        await joinRoom(inputRoomId.trim().toUpperCase(), {
+          name,
+          isLocal: true
+        });
+
+        setRoomId(inputRoomId.trim().toUpperCase());
+        setMaxParticipants(roomDetails.maxParticipants);
+        setSelectedTopicType(roomDetails.topicType);
+        setSelectedTopic(roomDetails.topic);
+        setDiscussionTimer(roomDetails.duration);
+        setParticipants(roomDetails.participants);
+        
+        socketService.connect(inputRoomId.trim().toUpperCase());
+        await initializeStream();
+        setStep(4);
+      }
+    } catch (err) {
+      setError(err.message);
     }
   };
 
-  const handleCreateRoom = () => {
-    setIsAdmin(true);
-    setStep(3);
+  const handleCreateRoom = async () => {
+    try {
+      setError(null);
+      const response = await createRoom({
+        maxParticipants,
+        topicType: selectedTopicType,
+        topic: selectedTopic,
+        duration: discussionTimer
+      });
+      setRoomId(response.roomId);
+      setIsAdmin(true);
+      socketService.connect(response.roomId);
+      setStep(3);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
-  const handleStartDiscussion = () => {
-    initializeStream();
-    setParticipants(prev => [...prev, { id: Date.now(), name, isLocal: true }]);
-    setStep(4);
-    setIsPreparing(true);
+  const handleStartDiscussion = async () => {
+    try {
+      setError(null);
+      await initializeStream();
+      const response = await updateParticipant(roomId, Date.now(), {
+        name,
+        isLocal: true,
+        isReady: true
+      });
+      
+      if (response.allReady) {
+        socketService.send('start_discussion', { roomId });
+        setIsPreparing(true);
+        setIsWaitingForMembers(false);
+      }
+      setStep(4);
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleNameSubmit = (e) => {
@@ -203,6 +311,12 @@ const GroupDiscussion = () => {
 
   return (
     <div className={styles.container}>
+      {error && (
+        <div className={styles.errorMessage}>
+          {error}
+        </div>
+      )}
+
       {step === 1 && (
         <div className={styles.setupCard}>
           <h1 className={styles.title}>Welcome to Group Discussion</h1>
@@ -347,7 +461,11 @@ const GroupDiscussion = () => {
               {isAdmin && <p className={styles.adminBadge}>Admin</p>}
             </div>
             <div className={styles.timer}>
-              {isPreparing ? (
+              {isWaitingForMembers ? (
+                <div className={styles.inviteTimer}>
+                  Invite expires in: {formatTime(inviteTimer)}
+                </div>
+              ) : isPreparing ? (
                 <div className={styles.prepTimer}>
                   Preparation Time: {formatTime(prepTimer)}
                 </div>
@@ -367,9 +485,42 @@ const GroupDiscussion = () => {
             <span className={`${styles.copyIndicator} ${showCopyIndicator ? styles.visible : ''}`}>
               Copied!
             </span>
+            {isWaitingForMembers && (
+              <div className={styles.inviteInfo}>
+                <p>Waiting for {maxParticipants - participants.length} more members</p>
+                <div className={styles.shareOptions}>
+                  <button 
+                    className={styles.shareButton} 
+                    onClick={() => {
+                      const shareText = `Join my Group Discussion!\nRoom ID: ${roomId}\nExpires in: ${formatTime(inviteTimer)}`;
+                      navigator.clipboard.writeText(shareText);
+                      setShowCopyIndicator(true);
+                      setTimeout(() => setShowCopyIndicator(false), 2000);
+                    }}
+                  >
+                    Share Invite
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {showStartMessage && (
+          {showInviteExpired && (
+            <div className={styles.expiredMessage}>
+              Invite has expired! Please create a new room.
+            </div>
+          )}
+
+          {isWaitingForMembers && (
+            <div className={styles.waitingMessage}>
+              Waiting for all members to join...
+              <p className={styles.waitingCount}>
+                {participants.length} of {maxParticipants} members present
+              </p>
+            </div>
+          )}
+
+          {showStartMessage && !isWaitingForMembers && (
             <div className={styles.startMessage}>
               Group Discussion Started!
             </div>
@@ -431,6 +582,12 @@ const GroupDiscussion = () => {
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {connectionStatus === 'disconnected' && (step === 4 || step === 5) && (
+        <div className={styles.connectionMessage}>
+          Reconnecting to room...
         </div>
       )}
     </div>
