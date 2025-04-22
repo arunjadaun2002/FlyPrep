@@ -100,16 +100,7 @@ app.post('/api/rooms/create', (req, res) => {
     };
     
     rooms.set(roomId, room);
-    console.log('Created room:', room);
-
-    const response = { 
-      roomId,
-      participant,
-      message: 'Room created successfully' 
-    };
-    console.log('Sending response:', response);
-    
-    res.status(201).json(response);
+    res.json({ roomId, participant });
   } catch (error) {
     console.error('Error creating room:', error);
     res.status(500).json({ message: 'Failed to create room' });
@@ -166,36 +157,50 @@ app.post('/api/rooms/join/:roomId', (req, res) => {
   }
 });
 
+// Add participant update endpoint
 app.put('/api/rooms/participant/:roomId/:participantId', (req, res) => {
   try {
     const { roomId, participantId } = req.params;
     const updateData = req.body;
+    
+    console.log('Updating participant:', { roomId, participantId, updateData });
+    
     const room = rooms.get(roomId);
-
     if (!room) {
+      console.log('Room not found:', roomId);
       return res.status(404).json({ message: 'Room not found' });
     }
-
-    const participantIndex = room.participants.findIndex(p => p.id.toString() === participantId);
+    
+    const participantIndex = room.participants.findIndex(p => p.id === parseInt(participantId));
     if (participantIndex === -1) {
+      console.log('Participant not found:', participantId);
       return res.status(404).json({ message: 'Participant not found' });
     }
-
+    
+    // Update participant data
     room.participants[participantIndex] = {
       ...room.participants[participantIndex],
       ...updateData
     };
-
-    const allReady = room.participants.length === room.maxParticipants && 
-                     room.participants.every(p => p.isReady);
-
-    rooms.set(roomId, room);
-
-    res.json({ 
-      participant: room.participants[participantIndex],
-      allReady,
-      message: 'Participant updated successfully' 
-    });
+    
+    // Broadcast the update to all connected clients
+    const roomConnections = connections.get(roomId);
+    if (roomConnections) {
+      roomConnections.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'participant_updated',
+            payload: {
+              participantId: parseInt(participantId),
+              participant: room.participants[participantIndex]
+            }
+          }));
+        }
+      });
+    }
+    
+    console.log('Participant updated successfully');
+    res.json({ success: true, participant: room.participants[participantIndex] });
   } catch (error) {
     console.error('Error updating participant:', error);
     res.status(500).json({ message: 'Failed to update participant' });
