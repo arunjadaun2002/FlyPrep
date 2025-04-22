@@ -72,6 +72,20 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Add CSP headers
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "font-src 'self' data: https:; " +
+    "img-src 'self' data: https:; " +
+    "connect-src 'self' https://flyprep-backend.onrender.com wss://flyprep-backend.onrender.com;"
+  );
+  next();
+});
+
 // In-memory storage for rooms (replace with a database in production)
 const rooms = new Map();
 
