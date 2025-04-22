@@ -72,17 +72,28 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Add CSP headers
+// Add CSP headers with more permissive settings
 app.use((req, res, next) => {
+  // Remove any existing CSP headers
+  res.removeHeader('Content-Security-Policy');
+  
+  // Set a more permissive CSP
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "font-src 'self' data: https:; " +
-    "img-src 'self' data: https:; " +
-    "connect-src 'self' https://flyprep-backend.onrender.com wss://flyprep-backend.onrender.com;"
+    "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+    "script-src * 'unsafe-inline' 'unsafe-eval'; " +
+    "style-src * 'unsafe-inline'; " +
+    "font-src * data:; " +
+    "img-src * data: blob:; " +
+    "connect-src * ws: wss:;"
   );
+  
+  // Also set Cross-Origin-Embedder-Policy to allow loading resources
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  
+  // Set Cross-Origin-Resource-Policy to allow loading resources
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  
   next();
 });
 
