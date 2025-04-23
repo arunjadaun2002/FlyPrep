@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, getRoom, joinRoom, updateParticipant } from '../services/api';
 import { socketService } from '../services/socket';
@@ -77,7 +77,7 @@ const GroupDiscussion = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [showStartMessage, setShowStartMessage] = useState(false);
-  const videoRef = useRef(null);
+  const [showPrepMessage, setShowPrepMessage] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
   const [showCopyIndicator, setShowCopyIndicator] = useState(false);
@@ -87,9 +87,115 @@ const GroupDiscussion = () => {
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [participantId, setParticipantId] = useState(null);
+  const [shouldInitStream, setShouldInitStream] = useState(false);
   const [localStream, setLocalStream] = useState(null);
   const [streamError, setStreamError] = useState(null);
   const [isStreamInitialized, setIsStreamInitialized] = useState(false);
+
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
+  // Define cleanupStream first
+  const cleanupStream = useCallback(() => {
+    console.log('Cleaning up stream...');
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setLocalStream(null);
+    setIsStreamInitialized(false);
+    setIsCameraOn(false);
+    setIsMicOn(false);
+    setShouldInitStream(false);
+  }, []);
+
+  // Effect for cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupStream();
+    };
+  }, [cleanupStream]);
+
+  // Effect to handle stream initialization
+  useEffect(() => {
+    const initializeStream = async () => {
+      if (!shouldInitStream || streamRef.current) return;
+
+      try {
+        console.log('Setting up stream...');
+        
+        // First cleanup any existing stream
+        cleanupStream();
+
+        // Request camera permissions with more specific constraints
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'user'
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+
+        console.log('Stream obtained successfully');
+        
+        // Ensure video track exists and is enabled
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) {
+          throw new Error('No video track available');
+        }
+        videoTrack.enabled = true;
+
+        // Ensure audio track exists and is enabled
+        const audioTrack = stream.getAudioTracks()[0];
+        if (!audioTrack) {
+          throw new Error('No audio track available');
+        }
+        audioTrack.enabled = true;
+
+        streamRef.current = stream;
+        setLocalStream(stream);
+        
+        // Set the stream to the video element
+        if (videoRef.current) {
+          console.log('Setting stream to video element');
+          videoRef.current.srcObject = stream;
+          videoRef.current.muted = false;
+          
+          try {
+            await videoRef.current.play();
+            console.log('Video playing successfully');
+            setIsStreamInitialized(true);
+            setIsCameraOn(true);
+            setIsMicOn(true);
+            setStreamError(null);
+          } catch (err) {
+            console.error('Error playing video:', err);
+            setStreamError(err.message);
+          }
+        } else {
+          console.error('Video element not found');
+          setStreamError('Video element not found');
+        }
+      } catch (error) {
+        console.error('Error setting up stream:', error);
+        setStreamError(error.message);
+        setError(`Camera access error: ${error.message}`);
+        cleanupStream();
+      }
+    };
+
+    initializeStream();
+  }, [shouldInitStream, cleanupStream]);
 
   useEffect(() => {
     if (selectedTopicType) {
@@ -148,6 +254,7 @@ const GroupDiscussion = () => {
     }
   }, [participants.length, maxParticipants, step]);
 
+  // Effect to handle socket events
   useEffect(() => {
     const handleConnectionStatus = (data) => {
       console.log('Connection status:', data);
@@ -176,6 +283,11 @@ const GroupDiscussion = () => {
       });
       
       setIsWaitingForMembers(data.participants.length < data.maxParticipants);
+      
+      // Initialize camera for joined participants
+      if (!isAdmin && !streamRef.current) {
+        setShouldInitStream(true);
+      }
     };
 
     const handleParticipantJoined = (data) => {
@@ -201,25 +313,57 @@ const GroupDiscussion = () => {
       });
     };
 
-    const handleDiscussionStart = () => {
-      setIsPreparing(true);
-      setIsWaitingForMembers(false);
+    const handlePrepTimerUpdate = (data) => {
+      if (!isAdmin) {
+        setPrepTimer(data.time);
+        setIsPreparing(true);
+        setShowPrepMessage(true);
+      }
     };
 
+    const handleDiscussionTimerUpdate = (data) => {
+      if (!isAdmin) {
+        setDiscussionTimer(data.time);
+      }
+    };
+
+    const handleDiscussionStart = (data) => {
+      setIsPreparing(false);
+      setIsTimerRunning(true);
+      setShowStartMessage(true);
+      setTimeout(() => {
+        setShowStartMessage(false);
+        setShowPrepMessage(false);
+      }, 3000);
+    };
+
+    const handleDiscussionEnd = () => {
+      setIsTimerRunning(false);
+      setDiscussionTimer(0);
+    };
+
+    // Register all socket event handlers
     socketService.on('connection', handleConnectionStatus);
     socketService.on('room_state', handleRoomState);
     socketService.on('participant_joined', handleParticipantJoined);
     socketService.on('participant_left', handleParticipantLeft);
+    socketService.on('prep_timer_update', handlePrepTimerUpdate);
+    socketService.on('discussion_timer_update', handleDiscussionTimerUpdate);
     socketService.on('discussion_start', handleDiscussionStart);
+    socketService.on('discussion_end', handleDiscussionEnd);
 
     return () => {
+      // Clean up all socket event handlers
       socketService.off('connection', handleConnectionStatus);
       socketService.off('room_state', handleRoomState);
       socketService.off('participant_joined', handleParticipantJoined);
       socketService.off('participant_left', handleParticipantLeft);
+      socketService.off('prep_timer_update', handlePrepTimerUpdate);
+      socketService.off('discussion_timer_update', handleDiscussionTimerUpdate);
       socketService.off('discussion_start', handleDiscussionStart);
+      socketService.off('discussion_end', handleDiscussionEnd);
     };
-  }, [maxParticipants]);
+  }, [isAdmin, maxParticipants]);
 
   // Effect to check if all participants have joined
   useEffect(() => {
@@ -235,109 +379,84 @@ const GroupDiscussion = () => {
     }
   }, [participants.length, maxParticipants, isAdmin]);
 
-  // Improved stream initialization
-  const initializeStream = async () => {
-    try {
-      console.log('Attempting to access media devices...');
-      
-      // First check if we already have a stream
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-      }
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 },
-          aspectRatio: 16/9
-        },
-        audio: true
-      });
-
-      console.log('Media stream obtained successfully');
-      const videoTrack = mediaStream.getVideoTracks()[0];
-      console.log('Video track:', videoTrack?.label, 'enabled:', videoTrack?.enabled);
-      
-      if (!videoTrack) {
-        throw new Error('No video track available');
-      }
-
-      // Set the stream to state
-      setLocalStream(mediaStream);
-      setStream(mediaStream);
-      setIsStreamInitialized(true);
-      setIsCameraOn(true);
-      setIsMicOn(true);
-      
-      return mediaStream;
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
-      setStreamError(error.message);
-      setError(`Camera access error: ${error.message}`);
-      return null;
-    }
-  };
-
-  // Effect to handle video stream mounting
+  // Effect to handle preparation time and discussion start
   useEffect(() => {
-    if (localStream && videoRef.current && isStreamInitialized) {
-      console.log('Mounting video stream to element');
-      videoRef.current.srcObject = localStream;
+    let prepInterval;
+    if (isPreparing && prepTimer > 0) {
+      // Show preparation message
+      setShowPrepMessage(true);
       
-      const playVideo = async () => {
-        try {
-          await videoRef.current.play();
-          console.log('Video playing in mount effect');
-          setStreamError(null);
-        } catch (err) {
-          console.error('Error playing video in mount effect:', err);
-          setStreamError('Failed to play video feed');
-        }
-      };
-
-      videoRef.current.onloadedmetadata = () => {
-        playVideo();
-      };
-
-      // Add error event listener
-      videoRef.current.onerror = (e) => {
-        console.error('Video element error in mount:', e);
-        setStreamError('Error displaying video feed');
-      };
-    }
-  }, [localStream, isStreamInitialized]);
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      if (localStream) {
-        localStream.getTracks().forEach(track => {
-          track.stop();
+      prepInterval = setInterval(() => {
+        setPrepTimer(prev => {
+          const newTime = prev - 1;
+          // Broadcast prep timer update to all participants
+          if (isAdmin) {
+            socketService.send('prep_timer_update', { time: newTime });
+          }
+          return newTime;
         });
+      }, 1000);
+    } else if (prepTimer === 0 && isPreparing) {
+      setIsPreparing(false);
+      setIsTimerRunning(true);
+      setShowStartMessage(true);
+      // Broadcast discussion start to all participants
+      if (isAdmin) {
+        socketService.send('discussion_start', { startTime: Date.now() });
       }
-    };
-  }, [localStream]);
+      setTimeout(() => {
+        setShowStartMessage(false);
+        setShowPrepMessage(false);
+      }, 3000);
+    }
+    return () => clearInterval(prepInterval);
+  }, [isPreparing, prepTimer, isAdmin]);
 
-  const toggleCamera = () => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
+  // Effect to handle discussion timer
+  useEffect(() => {
+    let discussionInterval;
+    if (isTimerRunning && discussionTimer > 0) {
+      discussionInterval = setInterval(() => {
+        setDiscussionTimer(prev => {
+          const newTime = prev - 1;
+          // Broadcast discussion timer update to all participants
+          if (isAdmin) {
+            socketService.send('discussion_timer_update', { time: newTime });
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else if (discussionTimer === 0) {
+      setIsTimerRunning(false);
+      // Handle discussion end
+      if (isAdmin) {
+        socketService.send('discussion_end');
+      }
+    }
+    return () => clearInterval(discussionInterval);
+  }, [isTimerRunning, discussionTimer, isAdmin]);
+
+  const toggleCamera = useCallback(() => {
+    if (streamRef.current) {
+      const videoTrack = streamRef.current.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
-        setIsCameraOn(!isCameraOn);
+        setIsCameraOn(videoTrack.enabled);
       }
     }
-  };
+  }, []);
 
-  const toggleMic = () => {
-    if (localStream) {
-      const audioTrack = localStream.getAudioTracks()[0];
+  const toggleMic = useCallback(() => {
+    if (streamRef.current) {
+      const audioTrack = streamRef.current.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
-        setIsMicOn(!isMicOn);
+        setIsMicOn(audioTrack.enabled);
       }
     }
-  };
+  }, []);
 
+  // Modified handleJoinRoom
   const handleJoinRoom = async () => {
     try {
       setError(null);
@@ -345,9 +464,30 @@ const GroupDiscussion = () => {
         const roomId = inputRoomId.trim().toUpperCase();
         console.log('Attempting to join room:', roomId);
         
-        // Initialize stream first
-        const stream = await initializeStream();
-        if (!stream) {
+        // Set flag to initialize stream
+        setShouldInitStream(true);
+        
+        // Wait for stream initialization with timeout
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Camera initialization timed out'));
+          }, 10000); // 10 second timeout
+
+          const checkStream = () => {
+            if (streamRef.current) {
+              clearTimeout(timeout);
+              resolve();
+            } else if (streamError) {
+              clearTimeout(timeout);
+              reject(new Error(streamError));
+            } else {
+              setTimeout(checkStream, 100);
+            }
+          };
+          checkStream();
+        });
+
+        if (!streamRef.current) {
           throw new Error('Failed to initialize camera and microphone');
         }
         
@@ -359,8 +499,13 @@ const GroupDiscussion = () => {
           throw new Error('Room is full');
         }
         
-        // Connect to WebSocket
-        await socketService.connect(roomId);
+        // Connect to WebSocket after getting room details
+        try {
+          await socketService.connect(roomId);
+        } catch (err) {
+          console.error('WebSocket connection error:', err);
+          throw new Error('Failed to connect to room. Please try again.');
+        }
         
         // Join room
         const joinResponse = await joinRoom(roomId, {
@@ -388,32 +533,45 @@ const GroupDiscussion = () => {
     } catch (err) {
       console.error('Error joining room:', err);
       setError(err.message);
+      cleanupStream();
       socketService.disconnect();
     }
   };
 
-  const handleCreateRoom = async () => {
-    try {
-      setError(null);
-      setIsAdmin(true);
-      setStep(3);
-    } catch (err) {
-      console.error('Error in handleCreateRoom:', err);
-      setError(err.message || 'Failed to setup room');
-    }
-  };
-
+  // Modified handleStartDiscussion
   const handleStartDiscussion = async () => {
     try {
       setError(null);
       
       if (isAdmin) {
-        // Initialize stream first
-        const stream = await initializeStream();
-        if (!stream) {
+        // Set flag to initialize stream
+        setShouldInitStream(true);
+        
+        // Wait for stream initialization with timeout
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Camera initialization timed out'));
+          }, 10000); // 10 second timeout
+
+          const checkStream = () => {
+            if (streamRef.current) {
+              clearTimeout(timeout);
+              resolve();
+            } else if (streamError) {
+              clearTimeout(timeout);
+              reject(new Error(streamError));
+            } else {
+              setTimeout(checkStream, 100);
+            }
+          };
+          checkStream();
+        });
+
+        if (!streamRef.current) {
           throw new Error('Failed to initialize camera and microphone');
         }
         
+        // Create room first
         const createResponse = await createRoom({
           maxParticipants,
           topicType: selectedTopicType,
@@ -426,8 +584,15 @@ const GroupDiscussion = () => {
         setParticipantId(createResponse.participant.id);
         setRoomId(currentRoomId);
         
-        await socketService.connect(currentRoomId);
+        // Connect to WebSocket after room creation
+        try {
+          await socketService.connect(currentRoomId);
+        } catch (err) {
+          console.error('WebSocket connection error:', err);
+          throw new Error('Failed to connect to room. Please try again.');
+        }
         
+        // Update participant status
         await updateParticipant(currentRoomId, createResponse.participant.id, {
           name,
           isLocal: true,
@@ -436,7 +601,6 @@ const GroupDiscussion = () => {
           isAdmin: true
         });
 
-        // Add the local participant to the participants list
         setParticipants([{
           id: createResponse.participant.id,
           name,
@@ -451,6 +615,7 @@ const GroupDiscussion = () => {
     } catch (err) {
       console.error('Error in handleStartDiscussion:', err);
       setError(err.message);
+      cleanupStream();
       socketService.disconnect();
     }
   };
@@ -469,8 +634,8 @@ const GroupDiscussion = () => {
     setTimeout(() => setShowCopyIndicator(false), 2000);
   };
 
-  // Update getParticipantSlots to handle stream initialization
-  const getParticipantSlots = () => {
+  // Modified getParticipantSlots
+  const getParticipantSlots = useCallback(() => {
     const slots = [];
     for (let i = 0; i < maxParticipants; i++) {
       const participant = participants[i];
@@ -490,18 +655,17 @@ const GroupDiscussion = () => {
               {isLocal ? (
                 <>
                   <video
-                    key="localVideo"
                     ref={videoRef}
                     autoPlay
                     playsInline
-                    muted
+                    muted={false}
                     style={{
                       width: '100%',
                       height: '100%',
                       objectFit: 'cover',
                       transform: 'scaleX(-1)',
                       backgroundColor: '#000',
-                      display: 'block',
+                      display: isStreamInitialized ? 'block' : 'none',
                       minHeight: '240px'
                     }}
                   />
@@ -539,13 +703,28 @@ const GroupDiscussion = () => {
       );
     }
     return slots;
-  };
+  }, [maxParticipants, participants, participantId, name, isStreamInitialized, streamError, isCameraOn]);
 
   return (
     <div className={styles.container}>
       {error && (
         <div className={styles.errorMessage}>
           {error}
+        </div>
+      )}
+
+      {showPrepMessage && (
+        <div className={styles.prepMessage}>
+          <div className={styles.prepMessageContent}>
+            <h2>Preparation Time</h2>
+            <p>Get ready! Discussion starts in {formatTime(prepTimer)}</p>
+          </div>
+        </div>
+      )}
+
+      {showStartMessage && (
+        <div className={styles.startMessage}>
+          Discussion Started!
         </div>
       )}
 
@@ -593,7 +772,10 @@ const GroupDiscussion = () => {
               <h2>Create Room</h2>
               <button 
                 className={styles.createButton}
-                onClick={handleCreateRoom}
+                onClick={() => {
+                  setIsAdmin(true);
+                  setStep(3);
+                }}
               >
                 Create New Room
               </button>
