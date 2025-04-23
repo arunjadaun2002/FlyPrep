@@ -11,12 +11,13 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-// Store WebSocket connections
+// Store WebSocket connections and rooms
 const connections = new Map();
+const rooms = new Map();
 
 // WebSocket connection handler
 wss.on('connection', (ws, req) => {
-  const roomId = req.url.split('/').pop();
+  const roomId = req.url.split('/').pop().toUpperCase();
   console.log(`Client connected to room: ${roomId}`);
 
   // Store the connection
@@ -25,6 +26,18 @@ wss.on('connection', (ws, req) => {
   }
   connections.get(roomId).add(ws);
 
+  // Send current room state to the newly connected client
+  const room = rooms.get(roomId);
+  if (room) {
+    console.log(`Sending room state to new client for room ${roomId}:`, room);
+    ws.send(JSON.stringify({
+      type: 'room_state',
+      payload: room
+    }));
+  } else {
+    console.log(`Room ${roomId} not found when client connected`);
+  }
+
   // Handle messages
   ws.on('message', (message) => {
     try {
@@ -32,18 +45,25 @@ wss.on('connection', (ws, req) => {
       const room = rooms.get(roomId);
 
       if (!room) {
+        console.log(`Room ${roomId} not found when processing message`);
         ws.send(JSON.stringify({ type: 'error', payload: 'Room not found' }));
         return;
       }
 
       // Broadcast to all clients in the room
       connections.get(roomId).forEach((client) => {
-        if (client !== ws && client.readyState === ws.OPEN) {
+        if (client.readyState === ws.OPEN) {
           client.send(JSON.stringify(data));
         }
       });
+
+      // If this is a room state update, update the room in memory
+      if (data.type === 'room_state') {
+        console.log(`Updating room state for room ${roomId}`);
+        rooms.set(roomId, data.payload);
+      }
     } catch (error) {
-      console.error('Error handling message:', error);
+      console.error(`Error handling message for room ${roomId}:`, error);
     }
   });
 
@@ -52,7 +72,11 @@ wss.on('connection', (ws, req) => {
     console.log(`Client disconnected from room: ${roomId}`);
     if (connections.has(roomId)) {
       connections.get(roomId).delete(ws);
+      
+      // If this was the last connection and room exists, clean up the room
       if (connections.get(roomId).size === 0) {
+        console.log(`Cleaning up empty room: ${roomId}`);
+        rooms.delete(roomId);
         connections.delete(roomId);
       }
     }
@@ -61,7 +85,7 @@ wss.on('connection', (ws, req) => {
 
 // CORS configuration
 const corsOptions = {
-  origin: ['https://flyprep-frontend.onrender.com', 'http://localhost:5000'],
+  origin: ['https://flyprep-frontend.onrender.com', 'http://localhost:5000', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -72,33 +96,61 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Add CSP headers with more permissive settings
+// Ensure NODE_ENV is set to development for local testing
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+  console.log('NODE_ENV set to development');
+}
+
+// Remove CSP headers for local development - this must run early in the middleware chain
 app.use((req, res, next) => {
-  // Remove any existing CSP headers
+  // Remove all CSP-related headers
   res.removeHeader('Content-Security-Policy');
+  res.removeHeader('Content-Security-Policy-Report-Only');
+  res.removeHeader('X-Content-Security-Policy');
+  res.removeHeader('X-WebKit-CSP');
+  res.removeHeader('X-Frame-Options');
+  res.removeHeader('X-XSS-Protection');
+  res.removeHeader('Referrer-Policy');
+  res.removeHeader('Cross-Origin-Embedder-Policy');
+  res.removeHeader('Cross-Origin-Resource-Policy');
+  res.removeHeader('Cross-Origin-Opener-Policy');
   
-  // Set a more permissive CSP
-  res.setHeader(
-    'Content-Security-Policy',
-    "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
-    "script-src * 'unsafe-inline' 'unsafe-eval'; " +
-    "style-src * 'unsafe-inline'; " +
-    "font-src * data:; " +
-    "img-src * data: blob:; " +
-    "connect-src * ws: wss:;"
-  );
-  
-  // Also set Cross-Origin-Embedder-Policy to allow loading resources
-  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
-  
-  // Set Cross-Origin-Resource-Policy to allow loading resources
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  // Add a header to indicate CSP is disabled
+  res.setHeader('X-CSP-Disabled', 'true');
   
   next();
 });
 
-// In-memory storage for rooms (replace with a database in production)
-const rooms = new Map();
+// Handle CSP headers (only used in production)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    // If DISABLE_CSP is set to true, don't set any CSP headers
+    if (process.env.DISABLE_CSP === 'true') {
+      console.log('CSP is disabled');
+      return next();
+    }
+    
+    // Set CSP header from environment variable or use a default
+    const cspHeader = process.env.CSP_HEADER || 
+      "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+      "script-src * 'unsafe-inline' 'unsafe-eval'; " +
+      "style-src * 'unsafe-inline'; " +
+      "font-src * data:; " +
+      "img-src * data: blob:; " +
+      "connect-src * ws: wss:;";
+    
+    res.setHeader('Content-Security-Policy', cspHeader);
+    
+    // Also set Cross-Origin-Embedder-Policy to allow loading resources
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+    
+    // Set Cross-Origin-Resource-Policy to allow loading resources
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    
+    next();
+  });
+}
 
 // Room routes
 app.post('/api/rooms/create', (req, res) => {
@@ -106,11 +158,17 @@ app.post('/api/rooms/create', (req, res) => {
     console.log('Received room creation request:', req.body);
     const { maxParticipants, topicType, topic, duration, name } = req.body;
     const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    console.log(`Generated room ID: ${roomId}`);
     
+    // Create the first participant (room creator)
+    const participantId = Date.now();
     const participant = {
-      id: Date.now(),
+      id: participantId,
       name: name || 'Room Creator',
       isLocal: true,
+      isAdmin: true,
+      isReady: false,
+      hasStream: false,
       joinedAt: new Date()
     };
     
@@ -122,9 +180,24 @@ app.post('/api/rooms/create', (req, res) => {
       duration,
       participants: [participant],
       createdAt: new Date(),
+      status: 'waiting'
     };
     
     rooms.set(roomId, room);
+    console.log(`Room created successfully: ${roomId}`, room);
+
+    // Broadcast room creation to all connected clients
+    if (connections.has(roomId)) {
+      connections.get(roomId).forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'room_state',
+            payload: room
+          }));
+        }
+      });
+    }
+
     res.json({ roomId, participant });
   } catch (error) {
     console.error('Error creating room:', error);
@@ -134,13 +207,17 @@ app.post('/api/rooms/create', (req, res) => {
 
 app.get('/api/rooms/:roomId', (req, res) => {
   try {
-    const { roomId } = req.params;
+    const roomId = req.params.roomId.toUpperCase();
+    console.log(`Getting room details for room: ${roomId}`);
+    
     const room = rooms.get(roomId);
     
     if (!room) {
+      console.log(`Room ${roomId} not found`);
       return res.status(404).json({ message: 'Room not found' });
     }
 
+    console.log(`Room details for ${roomId}:`, room);
     res.json(room);
   } catch (error) {
     console.error('Error getting room:', error);
@@ -150,15 +227,19 @@ app.get('/api/rooms/:roomId', (req, res) => {
 
 app.post('/api/rooms/join/:roomId', (req, res) => {
   try {
-    const { roomId } = req.params;
+    const roomId = req.params.roomId.toUpperCase();
     const { name, isLocal } = req.body;
+    console.log(`Joining room ${roomId} with name ${name}`);
+    
     const room = rooms.get(roomId);
 
     if (!room) {
+      console.log(`Room ${roomId} not found when trying to join`);
       return res.status(404).json({ message: 'Room not found' });
     }
 
     if (room.participants.length >= room.maxParticipants) {
+      console.log(`Room ${roomId} is full`);
       return res.status(400).json({ message: 'Room is full' });
     }
 
@@ -166,14 +247,33 @@ app.post('/api/rooms/join/:roomId', (req, res) => {
       id: Date.now(),
       name,
       isLocal,
+      isReady: false,
+      hasStream: false,
       joinedAt: new Date()
     };
 
+    // Add participant to room
     room.participants.push(participant);
     rooms.set(roomId, room);
+    console.log(`Participant ${participant.id} added to room ${roomId}`);
 
+    // Broadcast updated room state to all clients
+    const roomConnections = connections.get(roomId);
+    if (roomConnections) {
+      roomConnections.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'room_state',
+            payload: room
+          }));
+        }
+      });
+    }
+
+    console.log(`Participant joined successfully: ${roomId}`, participant);
     res.status(200).json({ 
       participant,
+      room, // Send full room state
       message: 'Joined room successfully' 
     });
   } catch (error) {
@@ -185,7 +285,8 @@ app.post('/api/rooms/join/:roomId', (req, res) => {
 // Add participant update endpoint
 app.put('/api/rooms/participant/:roomId/:participantId', (req, res) => {
   try {
-    const { roomId, participantId } = req.params;
+    const roomId = req.params.roomId.toUpperCase();
+    const { participantId } = req.params;
     const updateData = req.body;
     
     console.log('Updating participant:', { roomId, participantId, updateData });
@@ -196,7 +297,11 @@ app.put('/api/rooms/participant/:roomId/:participantId', (req, res) => {
       return res.status(404).json({ message: 'Room not found' });
     }
     
-    const participantIndex = room.participants.findIndex(p => p.id === parseInt(participantId));
+    // Try to find participant by ID
+    const participantIndex = room.participants.findIndex(p => 
+      String(p.id) === String(participantId)
+    );
+
     if (participantIndex === -1) {
       console.log('Participant not found:', participantId);
       return res.status(404).json({ message: 'Participant not found' });
@@ -208,24 +313,29 @@ app.put('/api/rooms/participant/:roomId/:participantId', (req, res) => {
       ...updateData
     };
     
-    // Broadcast the update to all connected clients
+    // Update room in memory
+    rooms.set(roomId, room);
+    
+    // Broadcast updated room state to all clients
     const roomConnections = connections.get(roomId);
     if (roomConnections) {
       roomConnections.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
           client.send(JSON.stringify({
-            type: 'participant_updated',
-            payload: {
-              participantId: parseInt(participantId),
-              participant: room.participants[participantIndex]
-            }
+            type: 'room_state',
+            payload: room
           }));
         }
       });
     }
     
     console.log('Participant updated successfully');
-    res.json({ success: true, participant: room.participants[participantIndex] });
+    res.json({ 
+      success: true, 
+      participant: room.participants[participantIndex],
+      room, // Send full room state
+      allReady: room.participants.every(p => p.isReady)
+    });
   } catch (error) {
     console.error('Error updating participant:', error);
     res.status(500).json({ message: 'Failed to update participant' });

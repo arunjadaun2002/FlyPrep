@@ -86,12 +86,10 @@ const GroupDiscussion = () => {
   const [showInviteExpired, setShowInviteExpired] = useState(false);
   const [error, setError] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
-
-  useEffect(() => {
-    if (isAdmin) {
-      setRoomId(Math.random().toString(36).substring(2, 8).toUpperCase());
-    }
-  }, [isAdmin]);
+  const [participantId, setParticipantId] = useState(null);
+  const [localStream, setLocalStream] = useState(null);
+  const [streamError, setStreamError] = useState(null);
+  const [isStreamInitialized, setIsStreamInitialized] = useState(false);
 
   useEffect(() => {
     if (selectedTopicType) {
@@ -152,15 +150,55 @@ const GroupDiscussion = () => {
 
   useEffect(() => {
     const handleConnectionStatus = (data) => {
+      console.log('Connection status:', data);
       setConnectionStatus(data.status);
+      // If we're connected to a room, update the room ID
+      if (data.status === 'connected' && data.roomId) {
+        setRoomId(data.roomId);
+      }
+    };
+
+    const handleRoomState = (data) => {
+      console.log('Received room state:', data);
+      if (!data) return;
+      
+      setMaxParticipants(data.maxParticipants);
+      setSelectedTopicType(data.topicType);
+      setSelectedTopic(data.topic);
+      setDiscussionTimer(data.duration);
+      
+      // Update participants list, ensuring no duplicates
+      setParticipants(prevParticipants => {
+        const newParticipants = data.participants.filter(p => 
+          !prevParticipants.some(existing => existing.id === p.id)
+        );
+        return [...prevParticipants, ...newParticipants];
+      });
+      
+      setIsWaitingForMembers(data.participants.length < data.maxParticipants);
     };
 
     const handleParticipantJoined = (data) => {
-      setParticipants(prev => [...prev, data.participant]);
+      console.log('Participant joined:', data);
+      setParticipants(prev => {
+        // Check if participant already exists
+        const exists = prev.some(p => p.id === data.participant.id);
+        if (!exists) {
+          const newParticipants = [...prev, data.participant];
+          setIsWaitingForMembers(newParticipants.length < maxParticipants);
+          return newParticipants;
+        }
+        return prev;
+      });
     };
 
     const handleParticipantLeft = (data) => {
-      setParticipants(prev => prev.filter(p => p.id !== data.participantId));
+      console.log('Participant left:', data);
+      setParticipants(prev => {
+        const newParticipants = prev.filter(p => p.id !== data.participantId);
+        setIsWaitingForMembers(newParticipants.length < maxParticipants);
+        return newParticipants;
+      });
     };
 
     const handleDiscussionStart = () => {
@@ -169,49 +207,134 @@ const GroupDiscussion = () => {
     };
 
     socketService.on('connection', handleConnectionStatus);
+    socketService.on('room_state', handleRoomState);
     socketService.on('participant_joined', handleParticipantJoined);
     socketService.on('participant_left', handleParticipantLeft);
     socketService.on('discussion_start', handleDiscussionStart);
 
     return () => {
       socketService.off('connection', handleConnectionStatus);
+      socketService.off('room_state', handleRoomState);
       socketService.off('participant_joined', handleParticipantJoined);
       socketService.off('participant_left', handleParticipantLeft);
       socketService.off('discussion_start', handleDiscussionStart);
-      socketService.disconnect();
     };
-  }, []);
+  }, [maxParticipants]);
 
+  // Effect to check if all participants have joined
+  useEffect(() => {
+    if (participants.length === maxParticipants) {
+      if (isAdmin) {
+        // Automatically start discussion after a short delay
+        setTimeout(() => {
+          socketService.send('start_discussion');
+          setIsPreparing(true);
+          setIsWaitingForMembers(false);
+        }, 2000);
+      }
+    }
+  }, [participants.length, maxParticipants, isAdmin]);
+
+  // Improved stream initialization
   const initializeStream = async () => {
     try {
+      console.log('Attempting to access media devices...');
+      
+      // First check if we already have a stream
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+      }
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
+        video: {
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 },
+          aspectRatio: 16/9
+        },
         audio: true
       });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+
+      console.log('Media stream obtained successfully');
+      const videoTrack = mediaStream.getVideoTracks()[0];
+      console.log('Video track:', videoTrack?.label, 'enabled:', videoTrack?.enabled);
+      
+      if (!videoTrack) {
+        throw new Error('No video track available');
       }
+
+      // Set the stream to state
+      setLocalStream(mediaStream);
+      setStream(mediaStream);
+      setIsStreamInitialized(true);
       setIsCameraOn(true);
       setIsMicOn(true);
+      
+      return mediaStream;
     } catch (error) {
       console.error('Error accessing media devices:', error);
+      setStreamError(error.message);
+      setError(`Camera access error: ${error.message}`);
+      return null;
     }
   };
 
+  // Effect to handle video stream mounting
+  useEffect(() => {
+    if (localStream && videoRef.current && isStreamInitialized) {
+      console.log('Mounting video stream to element');
+      videoRef.current.srcObject = localStream;
+      
+      const playVideo = async () => {
+        try {
+          await videoRef.current.play();
+          console.log('Video playing in mount effect');
+          setStreamError(null);
+        } catch (err) {
+          console.error('Error playing video in mount effect:', err);
+          setStreamError('Failed to play video feed');
+        }
+      };
+
+      videoRef.current.onloadedmetadata = () => {
+        playVideo();
+      };
+
+      // Add error event listener
+      videoRef.current.onerror = (e) => {
+        console.error('Video element error in mount:', e);
+        setStreamError('Error displaying video feed');
+      };
+    }
+  }, [localStream, isStreamInitialized]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          track.stop();
+        });
+      }
+    };
+  }, [localStream]);
+
   const toggleCamera = () => {
-    if (stream) {
-      const videoTrack = stream.getVideoTracks()[0];
-      videoTrack.enabled = !videoTrack.enabled;
-      setIsCameraOn(!isCameraOn);
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsCameraOn(!isCameraOn);
+      }
     }
   };
 
   const toggleMic = () => {
-    if (stream) {
-      const audioTrack = stream.getAudioTracks()[0];
-      audioTrack.enabled = !audioTrack.enabled;
-      setIsMicOn(!isMicOn);
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMicOn(!isMicOn);
+      }
     }
   };
 
@@ -219,68 +342,116 @@ const GroupDiscussion = () => {
     try {
       setError(null);
       if (inputRoomId.trim()) {
-        const roomDetails = await getRoom(inputRoomId.trim().toUpperCase());
+        const roomId = inputRoomId.trim().toUpperCase();
+        console.log('Attempting to join room:', roomId);
+        
+        // Initialize stream first
+        const stream = await initializeStream();
+        if (!stream) {
+          throw new Error('Failed to initialize camera and microphone');
+        }
+        
+        // Get room details
+        const roomDetails = await getRoom(roomId);
+        console.log('Room details:', roomDetails);
+        
         if (roomDetails.participants.length >= roomDetails.maxParticipants) {
           throw new Error('Room is full');
         }
         
-        await joinRoom(inputRoomId.trim().toUpperCase(), {
-          name,
-          isLocal: true
-        });
-
-        setRoomId(inputRoomId.trim().toUpperCase());
-        setMaxParticipants(roomDetails.maxParticipants);
-        setSelectedTopicType(roomDetails.topicType);
-        setSelectedTopic(roomDetails.topic);
-        setDiscussionTimer(roomDetails.duration);
-        setParticipants(roomDetails.participants);
+        // Connect to WebSocket
+        await socketService.connect(roomId);
         
-        socketService.connect(inputRoomId.trim().toUpperCase());
-        await initializeStream();
+        // Join room
+        const joinResponse = await joinRoom(roomId, {
+          name,
+          isLocal: true,
+          isReady: false
+        });
+        
+        // Update state
+        setRoomId(roomId);
+        setParticipantId(joinResponse.participant.id);
+        setSelectedTopic(roomDetails.topic);
+        setSelectedTopicType(roomDetails.topicType);
+        setMaxParticipants(roomDetails.maxParticipants);
+        setDiscussionTimer(roomDetails.duration);
+        
+        // Update participant status
+        await updateParticipant(roomId, joinResponse.participant.id, {
+          isReady: true,
+          hasStream: true
+        });
+        
         setStep(4);
       }
     } catch (err) {
+      console.error('Error joining room:', err);
       setError(err.message);
+      socketService.disconnect();
     }
   };
 
   const handleCreateRoom = async () => {
     try {
       setError(null);
-      const response = await createRoom({
-        maxParticipants,
-        topicType: selectedTopicType,
-        topic: selectedTopic,
-        duration: discussionTimer
-      });
-      setRoomId(response.roomId);
       setIsAdmin(true);
-      socketService.connect(response.roomId);
       setStep(3);
     } catch (err) {
-      setError(err.message);
+      console.error('Error in handleCreateRoom:', err);
+      setError(err.message || 'Failed to setup room');
     }
   };
 
   const handleStartDiscussion = async () => {
     try {
       setError(null);
-      await initializeStream();
-      const response = await updateParticipant(roomId, Date.now(), {
-        name,
-        isLocal: true,
-        isReady: true
-      });
       
-      if (response.allReady) {
-        socketService.send('start_discussion', { roomId });
-        setIsPreparing(true);
-        setIsWaitingForMembers(false);
+      if (isAdmin) {
+        // Initialize stream first
+        const stream = await initializeStream();
+        if (!stream) {
+          throw new Error('Failed to initialize camera and microphone');
+        }
+        
+        const createResponse = await createRoom({
+          maxParticipants,
+          topicType: selectedTopicType,
+          topic: selectedTopic,
+          duration: discussionTimer,
+          name
+        });
+        
+        const currentRoomId = createResponse.roomId;
+        setParticipantId(createResponse.participant.id);
+        setRoomId(currentRoomId);
+        
+        await socketService.connect(currentRoomId);
+        
+        await updateParticipant(currentRoomId, createResponse.participant.id, {
+          name,
+          isLocal: true,
+          isReady: true,
+          hasStream: true,
+          isAdmin: true
+        });
+
+        // Add the local participant to the participants list
+        setParticipants([{
+          id: createResponse.participant.id,
+          name,
+          isLocal: true,
+          isReady: true,
+          hasStream: true,
+          isAdmin: true
+        }]);
+        
+        setStep(4);
       }
-      setStep(4);
     } catch (err) {
+      console.error('Error in handleStartDiscussion:', err);
       setError(err.message);
+      socketService.disconnect();
     }
   };
 
@@ -291,22 +462,83 @@ const GroupDiscussion = () => {
     }
   };
 
-  // Mock participants for demo
-  useEffect(() => {
-    if (step === 4) {
-      const mockParticipants = Array.from({ length: maxParticipants - 1 }, (_, i) => ({
-        id: i + 1,
-        name: `Person ${i + 2}`,
-        isLocal: false
-      }));
-      setParticipants(prev => [...prev, ...mockParticipants]);
-    }
-  }, [step, maxParticipants]);
-
   const copyRoomId = () => {
+    // Copy only the room ID
     navigator.clipboard.writeText(roomId);
     setShowCopyIndicator(true);
     setTimeout(() => setShowCopyIndicator(false), 2000);
+  };
+
+  // Update getParticipantSlots to handle stream initialization
+  const getParticipantSlots = () => {
+    const slots = [];
+    for (let i = 0; i < maxParticipants; i++) {
+      const participant = participants[i];
+      const isLocal = participant?.id === participantId;
+      
+      slots.push(
+        <div 
+          key={i} 
+          className={`${styles.participantSlot} ${maxParticipants === 2 ? styles.twoParticipants : ''}`}
+          style={{ gridArea: maxParticipants === 2 ? (i === 0 ? 'left' : 'right') : 
+                           i === 0 ? 'left' : 
+                           i === 1 ? 'right' : 
+                           i === 2 ? 'top' : 'bottom' }}
+        >
+          <div className={styles.participantBox}>
+            <div className={styles.videoContainer}>
+              {isLocal ? (
+                <>
+                  <video
+                    key="localVideo"
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transform: 'scaleX(-1)',
+                      backgroundColor: '#000',
+                      display: 'block',
+                      minHeight: '240px'
+                    }}
+                  />
+                  {!isStreamInitialized && (
+                    <div className={styles.streamInitializing}>
+                      Initializing camera...
+                    </div>
+                  )}
+                  {streamError && (
+                    <div className={styles.streamError}>
+                      {streamError}
+                    </div>
+                  )}
+                  {!isCameraOn && (
+                    <div className={styles.cameraOffOverlay}>
+                      Camera is off
+                    </div>
+                  )}
+                </>
+              ) : participant ? (
+                <div className={styles.mockVideo}>
+                  <span>📹</span>
+                </div>
+              ) : (
+                <div className={styles.emptySlot}>
+                  <span>Waiting...</span>
+                </div>
+              )}
+            </div>
+            <div className={styles.participantName}>
+              {isLocal ? name : participant?.name || "Waiting for participant..."}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return slots;
   };
 
   return (
@@ -456,11 +688,13 @@ const GroupDiscussion = () => {
 
       {(step === 4 || step === 5) && (
         <div className={styles.discussionRoom}>
-          <div className={styles.roomInfo}>
-            <div className={styles.roomDetails}>
-              {isAdmin && <p className={styles.adminBadge}>Admin</p>}
-            </div>
-            <div className={styles.timer}>
+          <div className={styles.roomHeader}>
+            <div className={styles.roomInfo}>
+              <h2>Welcome to Group Discussion</h2>
+              <div className={styles.roomIdDisplay}>
+                Room ID: <span className={styles.roomIdValue} onClick={copyRoomId}>{roomId}</span>
+                {showCopyIndicator && <div className={styles.copyIndicator}>Room ID Copied!</div>}
+              </div>
               {isWaitingForMembers ? (
                 <div className={styles.inviteTimer}>
                   Invite expires in: {formatTime(inviteTimer)}
@@ -477,109 +711,31 @@ const GroupDiscussion = () => {
             </div>
           </div>
 
-          <div className={styles.roomSideDisplay}>
-            <span className={styles.roomIdLabel}>Room ID</span>
-            <div className={styles.roomIdValue} onClick={copyRoomId} title="Click to copy">
-              {roomId}
-            </div>
-            <span className={`${styles.copyIndicator} ${showCopyIndicator ? styles.visible : ''}`}>
-              Copied!
-            </span>
-            {isWaitingForMembers && (
-              <div className={styles.inviteInfo}>
-                <p>Waiting for {maxParticipants - participants.length} more members</p>
-                <div className={styles.shareOptions}>
-                  <button 
-                    className={styles.shareButton} 
-                    onClick={() => {
-                      const shareText = `Join my Group Discussion!\nRoom ID: ${roomId}\nExpires in: ${formatTime(inviteTimer)}`;
-                      navigator.clipboard.writeText(shareText);
-                      setShowCopyIndicator(true);
-                      setTimeout(() => setShowCopyIndicator(false), 2000);
-                    }}
-                  >
-                    Share Invite
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {showInviteExpired && (
-            <div className={styles.expiredMessage}>
-              Invite has expired! Please create a new room.
-            </div>
-          )}
-
-          {isWaitingForMembers && (
-            <div className={styles.waitingMessage}>
-              Waiting for all members to join...
-              <p className={styles.waitingCount}>
-                {participants.length} of {maxParticipants} members present
-              </p>
-            </div>
-          )}
-
-          {showStartMessage && !isWaitingForMembers && (
-            <div className={styles.startMessage}>
-              Group Discussion Started!
-            </div>
-          )}
-
           <div className={styles.discussionLayout}>
-            <div className={styles.topic}>
-              <h3>{selectedTopic}</h3>
+            <div className={`${styles.participantsGrid} ${styles['participants' + maxParticipants]}`}>
+              {getParticipantSlots()}
+              
+              {/* Center topic */}
+              <div className={styles.topicCenter}>
+                {selectedTopic}
+              </div>
             </div>
 
-            <div className={styles.participantsCircle}>
-              {participants.map((participant, index) => {
-                const angle = (360 / participants.length) * index;
-                const style = {
-                  transform: `rotate(${angle}deg) translate(${300}px) rotate(-${angle}deg)`
-                };
-
-                return (
-                  <div 
-                    key={participant.id}
-                    className={styles.participantContainer}
-                    style={style}
-                  >
-                    {participant.isLocal ? (
-                      <div className={styles.videoWrapper}>
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted={true}
-                          className={styles.video}
-                        />
-                        <div className={styles.participantName}>{name}</div>
-                        <div className={styles.videoControls}>
-                          <button 
-                            onClick={toggleCamera}
-                            className={`${styles.controlButton} ${isCameraOn ? styles.active : ''}`}
-                          >
-                            {isCameraOn ? '🎥' : '🚫'}
-                          </button>
-                          <button 
-                            onClick={toggleMic}
-                            className={`${styles.controlButton} ${isMicOn ? styles.active : ''}`}
-                          >
-                            {isMicOn ? '🎤' : '🔇'}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={styles.videoWrapper}>
-                        <div className={styles.mockVideo}>
-                          <span>📹</span>
-                        </div>
-                        <div className={styles.participantName}>{participant.name}</div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className={styles.controlsContainer}>
+              <button 
+                onClick={toggleCamera}
+                className={`${styles.controlButton} ${isCameraOn ? styles.active : ''}`}
+                title={isCameraOn ? 'Turn off camera' : 'Turn on camera'}
+              >
+                {isCameraOn ? '🎥' : '🚫'}
+              </button>
+              <button 
+                onClick={toggleMic}
+                className={`${styles.controlButton} ${isMicOn ? styles.active : ''}`}
+                title={isMicOn ? 'Mute microphone' : 'Unmute microphone'}
+              >
+                {isMicOn ? '🎤' : '🔇'}
+              </button>
             </div>
           </div>
         </div>

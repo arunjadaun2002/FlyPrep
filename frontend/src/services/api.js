@@ -15,6 +15,11 @@ const handleResponse = async (response) => {
   return data;
 };
 
+// Helper function to ensure room ID is uppercase
+const normalizeRoomId = (roomId) => {
+  return roomId ? roomId.toString().toUpperCase() : '';
+};
+
 export const createRoom = async (roomData) => {
   try {
     const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.CREATE_ROOM}`, {
@@ -32,7 +37,10 @@ export const createRoom = async (roomData) => {
 
 export const joinRoom = async (roomId, participantData) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.JOIN_ROOM}/${roomId}`, {
+    const normalizedRoomId = normalizeRoomId(roomId);
+    console.log('Joining room with ID:', normalizedRoomId);
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.JOIN_ROOM}/${normalizedRoomId}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +55,10 @@ export const joinRoom = async (roomId, participantData) => {
 
 export const getRoom = async (roomId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_ROOM}/${roomId}`);
+    const normalizedRoomId = normalizeRoomId(roomId);
+    console.log('Getting room with ID:', normalizedRoomId);
+    
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GET_ROOM}/${normalizedRoomId}`);
     return handleResponse(response);
   } catch (error) {
     throw new ApiError(error.message || 'Failed to get room details', 500);
@@ -56,8 +67,11 @@ export const getRoom = async (roomId) => {
 
 export const updateParticipant = async (roomId, participantId, updateData) => {
   try {
+    const normalizedRoomId = normalizeRoomId(roomId);
+    console.log('Updating participant in room:', normalizedRoomId);
+    
     const response = await fetch(
-      `${API_BASE_URL}${API_ENDPOINTS.UPDATE_PARTICIPANT}/${roomId}/${participantId}`,
+      `${API_BASE_URL}${API_ENDPOINTS.UPDATE_PARTICIPANT}/${normalizedRoomId}/${participantId}`,
       {
         method: 'PUT',
         headers: {

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSP Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    .test-section {
+      margin-bottom: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+    }
+    .result {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <h1>CSP Test Page</h1>
+  
+  <div class="test-section">
+    <h2>Font Loading Test</h2>
+    <p style="font-family: 'Sentient-Variable', Arial, sans-serif;">This text should use Sentient-Variable font if available.</p>
+    <div class="result" id="font-result">Font loading result will appear here</div>
+  </div>
+  
+  <div class="test-section">
+    <h2>API Test</h2>
+    <button id="test-api">Test API</button>
+    <div class="result" id="api-result">API test result will appear here</div>
+  </div>
+  
+  <script>
+    // Test font loading
+    document.addEventListener('DOMContentLoaded', function() {
+      const fontResult = document.getElementById('font-result');
+      
+      // Check if the font is loaded
+      if (document.fonts.check('1em Sentient-Variable')) {
+        fontResult.textContent = 'Font loaded successfully!';
+        fontResult.style.color = 'green';
+      } else {
+        fontResult.textContent = 'Font failed to load. CSP might be blocking it.';
+        fontResult.style.color = 'red';
+      }
+    });
+    
+    // Test API
+    document.getElementById('test-api').addEventListener('click', function() {
+      const apiResult = document.getElementById('api-result');
+      
+      fetch('/api/test')
+        .then(response => response.json())
+        .then(data => {
+          apiResult.textContent = 'API test successful: ' + JSON.stringify(data);
+          apiResult.style.color = 'green';
+        })
+        .catch(error => {
+          apiResult.textContent = 'API test failed: ' + error.message;
+          apiResult.style.color = 'red';
+        });
+    });
+  </script>
+</body>
+</html> 
