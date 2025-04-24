@@ -365,54 +365,55 @@
   display: grid;
   gap: 1rem;
   padding: 1rem;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  transition: all 0.3s ease;
 }
 
-/* Grid layouts based on number of participants */
+/* Matrix layout for participants */
 .participants2 {
-  grid-template-areas: "left center right";
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .participants3 {
-  grid-template-areas:
-    ". top ."
-    "left center right";
-  grid-template-columns: 1fr auto 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .participants4 {
-  grid-template-areas:
-    ". top ."
-    "left center right"
-    ". bottom .";
-  grid-template-columns: 1fr auto 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.participants6 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.participantsGrid.withChat {
+  margin-right: 300px; /* Same as chat sidebar width */
 }
 
 .participantSlot {
   width: 100%;
-  height: 100%;
-  min-height: 300px;
+  aspect-ratio: 16/9;
   padding: 8px;
   background: #f8f9fa;
-  border-radius: 8px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
 }
 
-.twoParticipants {
-  max-width: 400px;
-  margin: 0 auto;
+.participantSlot.activeSpeaker {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  background: rgba(76, 110, 245, 0.1);
+  border: 2px solid #4C6EF5;
+  transform: scale(1.02);
+  z-index: 2;
 }
 
 .participantBox {
   width: 100%;
   height: 100%;
-  min-height: 300px;
-  display: flex;
-  flex-direction: column;
+  position: relative;
   background: #fff;
   border-radius: 8px;
   overflow: hidden;
@@ -423,7 +424,7 @@
   position: relative;
   width: 100%;
   height: 100%;
-  min-height: 240px;
+  min-height: 180px;
   background: #000;
   border-radius: 8px;
   overflow: hidden;
@@ -483,20 +484,24 @@
 }
 
 .topicCenter {
-  grid-area: center;
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
   background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
+  border-radius: 12px;
+  padding: 1rem 2rem;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   font-weight: 500;
   color: #2c3e50;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  max-width: 200px;
-  margin: auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+  max-width: 90%;
+  margin: 0 auto;
 }
 
 .controlsContainer {
@@ -539,6 +544,21 @@
 }
 
 /* Responsive adjustments */
+@media (max-width: 1200px) {
+  .participantsGrid.withChat {
+    margin-right: 0;
+  }
+  
+  .chatSidebar {
+    width: 280px;
+  }
+
+  .topicContainer {
+    top: 70px;
+    padding: 0.8rem 1.5rem;
+  }
+}
+
 @media (max-width: 768px) {
   .roomInfo {
     flex-direction: column;
@@ -551,34 +571,48 @@
   }
 
   .participantsGrid {
+    gap: 0.5rem;
     padding: 0.5rem;
   }
 
   .participants2,
   .participants3,
-  .participants4 {
-    grid-template-areas:
-      "left"
-      "center"
-      "right"
-      "bottom";
+  .participants4,
+  .participants6 {
     grid-template-columns: 1fr;
-    grid-template-rows: auto;
   }
 
-  .videoContainer {
-    min-height: 120px;
+  .participantSlot.activeSpeaker {
+    aspect-ratio: 16/9;
+  }
+
+  .chatSidebar {
+    width: 100%;
+    transform: translateX(100%);
+  }
+
+  .chatSidebar.visible {
+    transform: translateX(0);
   }
 
   .topicCenter {
-    padding: 1rem;
+    bottom: 100px;
     font-size: 1rem;
-    margin: 0.5rem 0;
+    padding: 0.8rem 1.5rem;
   }
 
   .controlButton {
     width: 36px;
     height: 36px;
+    font-size: 1rem;
+  }
+
+  .topicContainer {
+    top: 60px;
+    padding: 0.8rem 1rem;
+  }
+
+  .topicText {
     font-size: 1rem;
   }
 }
@@ -1217,4 +1251,158 @@
   0% { opacity: 0.6; }
   50% { opacity: 1; }
   100% { opacity: 0.6; }
+}
+
+.chatSidebar {
+  position: fixed;
+  right: 0;
+  top: 60px;
+  bottom: 0;
+  width: 300px;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transition: transform 0.3s ease;
+  border-left: 1px solid #e9ecef;
+}
+
+.chatToggleButton {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  padding: 12px 24px;
+  background: #4C6EF5;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chatToggleButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: #4263eb;
+}
+
+.chatToggleButton::before {
+  content: '💬';
+  font-size: 1.2rem;
+}
+
+/* Topic styles */
+.topicContainer {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(76, 110, 245, 0.2);
+  max-width: 80%;
+  text-align: center;
+}
+
+.topicLabel {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #4C6EF5;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.topicText {
+  font-size: 1.2rem;
+  color: #2c3e50;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Active speaker indicator */
+.speakingIndicator {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  background: #4CAF50;
+  color: white;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+  z-index: 10;
+}
+
+.speakingIndicator.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.speakingIndicator::before {
+  content: '🎤';
+  font-size: 1rem;
+}
+
+/* Audio level visualization */
+.audioLevel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: rgba(76, 110, 245, 0.2);
+}
+
+.audioLevelBar {
+  height: 100%;
+  background: #4C6EF5;
+  transition: width 0.1s ease;
+}
+
+@media (max-width: 1200px) {
+  .participantsGrid.withChat {
+    margin-right: 0;
+  }
+  
+  .topicContainer {
+    top: 70px;
+    padding: 0.8rem 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .participants2,
+  .participants3,
+  .participants4,
+  .participants6 {
+    grid-template-columns: 1fr;
+  }
+
+  .participantSlot.activeSpeaker {
+    aspect-ratio: 16/9;
+  }
+
+  .topicContainer {
+    top: 60px;
+    padding: 0.8rem 1rem;
+  }
+
+  .topicText {
+    font-size: 1rem;
+  }
 } 

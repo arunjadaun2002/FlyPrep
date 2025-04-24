@@ -1,7 +1,9 @@
+import { JitsiMeeting } from '@jitsi/react-sdk';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, getRoom, joinRoom, updateParticipant } from '../services/api';
 import { socketService } from '../services/socket';
+import Chat from './Chat';
 import styles from './GroupDiscussion.module.css';
 
 const TOPIC_TYPES = {
@@ -91,6 +93,15 @@ const GroupDiscussion = () => {
   const [localStream, setLocalStream] = useState(null);
   const [streamError, setStreamError] = useState(null);
   const [isStreamInitialized, setIsStreamInitialized] = useState(false);
+  const [jitsiApi, setJitsiApi] = useState(null);
+  const [isJitsiReady, setIsJitsiReady] = useState(false);
+
+  // Add chat visibility state
+  const [isChatVisible, setIsChatVisible] = useState(false);
+
+  // Add new state for active speaker
+  const [activeSpeaker, setActiveSpeaker] = useState(null);
+  const [audioLevels, setAudioLevels] = useState({});
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -634,55 +645,177 @@ const GroupDiscussion = () => {
     setTimeout(() => setShowCopyIndicator(false), 2000);
   };
 
+  // Effect to handle Jitsi Meet initialization
+  useEffect(() => {
+    if (roomId && step === 4) {
+      setIsJitsiReady(true);
+    }
+  }, [roomId, step]);
+
+  // Handle Jitsi Meet API ready
+  const handleApiReady = (apiObj) => {
+    setJitsiApi(apiObj);
+    console.log('Jitsi Meet API is ready');
+
+    // Set up audio level detection
+    apiObj.on('audioLevelsChanged', (levels) => {
+      const highestLevel = Object.entries(levels).reduce(
+        (max, [id, level]) => (level > max.level ? { id, level } : max),
+        { id: null, level: 0 }
+      );
+
+      if (highestLevel.level > 0.3) { // Threshold for speaking detection
+        setActiveSpeaker(highestLevel.id);
+        setAudioLevels(levels);
+      } else if (activeSpeaker === highestLevel.id) {
+        setActiveSpeaker(null);
+      }
+    });
+  };
+
+  // Handle Jitsi Meet participant joined
+  const handleParticipantJoined = (participant) => {
+    console.log('Participant joined:', participant);
+  };
+
+  // Handle Jitsi Meet participant left
+  const handleParticipantLeft = (participant) => {
+    console.log('Participant left:', participant);
+  };
+
+  // Handle Jitsi Meet video conference joined
+  const handleVideoConferenceJoined = (participant) => {
+    console.log('Video conference joined:', participant);
+  };
+
+  // Handle Jitsi Meet video conference left
+  const handleVideoConferenceLeft = (participant) => {
+    console.log('Video conference left:', participant);
+  };
+
   // Modified getParticipantSlots
   const getParticipantSlots = useCallback(() => {
-    const slots = [];
-    for (let i = 0; i < maxParticipants; i++) {
-      const participant = participants[i];
+    // Sort participants to put active speaker first
+    const sortedParticipants = [...participants].sort((a, b) => {
+      if (a.id === activeSpeaker) return -1;
+      if (b.id === activeSpeaker) return 1;
+      return 0;
+    });
+
+    return sortedParticipants.map((participant, index) => {
       const isLocal = participant?.id === participantId;
+      const isActiveSpeaker = participant?.id === activeSpeaker;
+      const audioLevel = audioLevels[participant?.id] || 0;
       
-      slots.push(
+      return (
         <div 
-          key={i} 
-          className={`${styles.participantSlot} ${maxParticipants === 2 ? styles.twoParticipants : ''}`}
-          style={{ gridArea: maxParticipants === 2 ? (i === 0 ? 'left' : 'right') : 
-                           i === 0 ? 'left' : 
-                           i === 1 ? 'right' : 
-                           i === 2 ? 'top' : 'bottom' }}
+          key={participant?.id || index}
+          className={`${styles.participantSlot} ${isActiveSpeaker ? styles.activeSpeaker : ''}`}
         >
           <div className={styles.participantBox}>
+            {isActiveSpeaker && (
+              <div className={`${styles.speakingIndicator} ${styles.active}`}>
+                Speaking
+              </div>
+            )}
             <div className={styles.videoContainer}>
               {isLocal ? (
                 <>
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted={false}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      transform: 'scaleX(-1)',
-                      backgroundColor: '#000',
-                      display: isStreamInitialized ? 'block' : 'none',
-                      minHeight: '240px'
-                    }}
-                  />
-                  {!isStreamInitialized && (
-                    <div className={styles.streamInitializing}>
-                      Initializing camera...
-                    </div>
-                  )}
-                  {streamError && (
-                    <div className={styles.streamError}>
-                      {streamError}
-                    </div>
-                  )}
-                  {!isCameraOn && (
-                    <div className={styles.cameraOffOverlay}>
-                      Camera is off
-                    </div>
+                  {isJitsiReady && (
+                    <JitsiMeeting
+                      domain="meet.jit.si"
+                      roomName={roomId}
+                      configOverwrite={{
+                        startWithAudioMuted: false,
+                        startWithVideoMuted: false,
+                        prejoinPageEnabled: false,
+                        disableDeepLinking: true,
+                        disableCalendarIntegration: true,
+                        hideLobbyButton: true,
+                        requireDisplayName: false,
+                        enableClosePage: false,
+                        disableThirdPartyRequests: true,
+                        notifications: [],
+                        calendar: {
+                          enabled: false
+                        },
+                        googleApi: {
+                          disabled: true
+                        },
+                        microsoftApi: {
+                          disabled: true
+                        },
+                        dropbox: {
+                          disabled: true
+                        },
+                        transcribingEnabled: false,
+                        toolbarButtons: [
+                          'microphone',
+                          'camera',
+                          'fullscreen',
+                          'fodeviceselection',
+                          'hangup',
+                          'profile',
+                          'chat',
+                          'raisehand',
+                          'videoquality',
+                          'filmstrip'
+                        ]
+                      }}
+                      interfaceConfigOverwrite={{
+                        TOOLBAR_BUTTONS: [
+                          'microphone',
+                          'camera',
+                          'fullscreen',
+                          'fodeviceselection',
+                          'hangup',
+                          'profile',
+                          'chat',
+                          'raisehand',
+                          'videoquality',
+                          'filmstrip'
+                        ],
+                        SHOW_JITSI_WATERMARK: false,
+                        SHOW_WATERMARK_FOR_GUESTS: false,
+                        DEFAULT_REMOTE_DISPLAY_NAME: 'Participant',
+                        TOOLBAR_ALWAYS_VISIBLE: true,
+                        DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
+                        HIDE_INVITE_MORE_HEADER: true,
+                        MOBILE_APP_PROMO: false,
+                        DISABLE_FOCUS_INDICATOR: true,
+                        DISABLE_DOMINANT_SPEAKER_INDICATOR: true,
+                        DISABLE_VIDEO_BACKGROUND: true,
+                        DISABLE_PRESENCE_STATUS: true,
+                        SETTINGS_SECTIONS: ['devices', 'language', 'moderator'],
+                        DEFAULT_BACKGROUND: '#ffffff',
+                        DISABLE_CALENDAR_INTEGRATION: true,
+                        CALENDAR_ENABLED: false,
+                        HIDE_DEEP_LINKING_LOGO: true
+                      }}
+                      userInfo={{
+                        displayName: name
+                      }}
+                      getIFrameRef={(iframeRef) => {
+                        iframeRef.style.height = '100%';
+                        iframeRef.style.width = '100%';
+                        // Add script to disable extension prompts
+                        const style = document.createElement('style');
+                        style.textContent = `
+                          .extension-prompt { display: none !important; }
+                          .calendar-integration { display: none !important; }
+                          .deep-linking-mobile-modal { display: none !important; }
+                          jitsi-meeting-external-api-popup { display: none !important; }
+                          .watermark { display: none !important; }
+                          .subject { display: none !important; }
+                        `;
+                        iframeRef.contentDocument?.head?.appendChild(style);
+                      }}
+                      onApiReady={handleApiReady}
+                      onParticipantJoined={handleParticipantJoined}
+                      onParticipantLeft={handleParticipantLeft}
+                      onVideoConferenceJoined={handleVideoConferenceJoined}
+                      onVideoConferenceLeft={handleVideoConferenceLeft}
+                    />
                   )}
                 </>
               ) : participant ? (
@@ -698,12 +831,17 @@ const GroupDiscussion = () => {
             <div className={styles.participantName}>
               {isLocal ? name : participant?.name || "Waiting for participant..."}
             </div>
+            <div className={styles.audioLevel}>
+              <div 
+                className={styles.audioLevelBar} 
+                style={{ width: `${Math.min(audioLevel * 100, 100)}%` }}
+              />
+            </div>
           </div>
         </div>
       );
-    }
-    return slots;
-  }, [maxParticipants, participants, participantId, name, isStreamInitialized, streamError, isCameraOn]);
+    });
+  }, [participants, participantId, name, isJitsiReady, roomId, activeSpeaker, audioLevels]);
 
   return (
     <div className={styles.container}>
@@ -894,38 +1032,42 @@ const GroupDiscussion = () => {
           </div>
 
           <div className={styles.discussionLayout}>
-            <div className={`${styles.participantsGrid} ${styles['participants' + maxParticipants]}`}>
+            {/* Updated topic display */}
+            <div className={styles.topicContainer}>
+              <div className={styles.topicLabel}>Discussion Topic</div>
+              <div className={styles.topicText}>{selectedTopic}</div>
+            </div>
+
+            <div className={`${styles.participantsGrid} ${styles[`participants${maxParticipants}`]} ${isChatVisible ? styles.withChat : ''}`}>
               {getParticipantSlots()}
-              
-              {/* Center topic */}
-              <div className={styles.topicCenter}>
-                {selectedTopic}
+            </div>
+
+            {/* Chat sidebar with visibility class */}
+            {isChatVisible && (
+              <div className={`${styles.chatSidebar} ${styles.visible}`}>
+                <Chat
+                  roomId={roomId}
+                  participantId={participantId}
+                  name={name}
+                  isAdmin={isAdmin}
+                />
               </div>
-            </div>
-
-            <div className={styles.controlsContainer}>
-              <button 
-                onClick={toggleCamera}
-                className={`${styles.controlButton} ${isCameraOn ? styles.active : ''}`}
-                title={isCameraOn ? 'Turn off camera' : 'Turn on camera'}
-              >
-                {isCameraOn ? '🎥' : '🚫'}
-              </button>
-              <button 
-                onClick={toggleMic}
-                className={`${styles.controlButton} ${isMicOn ? styles.active : ''}`}
-                title={isMicOn ? 'Mute microphone' : 'Unmute microphone'}
-              >
-                {isMicOn ? '🎤' : '🔇'}
-              </button>
-            </div>
+            )}
+            
+            {/* Updated chat toggle button */}
+            <button
+              className={styles.chatToggleButton}
+              onClick={() => setIsChatVisible(!isChatVisible)}
+            >
+              {isChatVisible ? 'Hide Chat' : 'Show Chat'}
+            </button>
           </div>
-        </div>
-      )}
 
-      {connectionStatus === 'disconnected' && (step === 4 || step === 5) && (
-        <div className={styles.connectionMessage}>
-          Reconnecting to room...
+          {connectionStatus === 'disconnected' && (step === 4 || step === 5) && (
+            <div className={styles.connectionMessage}>
+              Reconnecting to room...
+            </div>
+          )}
         </div>
       )}
     </div>

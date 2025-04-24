@@ -1,0 +1,277 @@
+.participantSlot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.participantSlot.activeSpeaker {
+  order: -1;
+  transform: scale(1.05);
+  z-index: 2;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.participantBox {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.speakingIndicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  background: rgba(0, 255, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 3;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+}
+
+.speakingIndicator.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.audioLevel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.audioLevelBar {
+  height: 100%;
+  background: #4CAF50;
+  transition: width 0.1s ease;
+}
+
+.chatSidebar {
+  position: fixed;
+  right: 0;
+  top: 60px;
+  bottom: 0;
+  width: 300px;
+  background: #1a1a1a;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  transition: transform 0.3s ease;
+  border-left: 1px solid #2d2d2d;
+  padding: 20px;
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.chatToggleButton {
+  position: fixed;
+  right: 20px;
+  bottom: 80px;
+  padding: 12px 28px;
+  background: linear-gradient(135deg, #4C6EF5, #3b5bdb);
+  color: white;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 4px 15px rgba(76, 110, 245, 0.3);
+  transition: all 0.3s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  backdrop-filter: blur(8px);
+}
+
+.chatToggleButton:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #5c7cff, #4c6ef5);
+  box-shadow: 0 6px 20px rgba(76, 110, 245, 0.4);
+}
+
+.chatToggleButton::before {
+  content: '💬';
+  font-size: 1.2rem;
+}
+
+/* When chat is open, position the button differently */
+.chatSidebar.visible ~ .chatToggleButton {
+  right: 320px;
+}
+
+/* Topic window styling */
+.topicContainer {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 300px;
+  max-width: 600px;
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #2E7D32, #388E3C);
+  border-radius: 12px;
+  margin: 0;
+  box-shadow: 0 4px 15px rgba(46, 125, 50, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+}
+
+.topicLabel {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 500;
+}
+
+.topicText {
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Participant grid adjustments */
+.participantsGrid {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+  width: 100%;
+  height: calc(100% - 180px);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-auto-rows: minmax(200px, 1fr);
+  margin-top: 140px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Chat message styling */
+.messageContainer {
+  margin-bottom: 16px;
+  padding: 10px 15px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+}
+
+.messageContainer:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateX(-2px);
+}
+
+.chatInputContainer {
+  position: relative;
+  margin-top: auto;
+  padding: 15px;
+  background: #1a1a1a;
+  border-top: 1px solid #2d2d2d;
+  margin-bottom: 60px;
+}
+
+.messageInput {
+  width: 100%;
+  padding: 12px 20px;
+  padding-right: 45px;
+  border: none;
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.messageInput:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(76, 110, 245, 0.3);
+}
+
+.sendButton {
+  position: absolute;
+  right: 25px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #4C6EF5;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  display: none;
+  z-index: 1002;
+}
+
+.messageInput:not(:placeholder-shown) + .sendButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sendButton:hover {
+  background: rgba(76, 110, 245, 0.1);
+  transform: scale(1.1);
+}
+
+.participantsGrid.withChat {
+  width: calc(100% - 300px);
+}
+
+/* Ensure the chat messages don't overlap with input */
+.messagesContainer {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+  margin-bottom: 10px;
+}
+
+/* Media queries for responsive design */
+@media (max-width: 768px) {
+  .topicContainer {
+    width: 90%;
+    min-width: auto;
+    top: 75px;
+  }
+
+  .participantsGrid {
+    margin-top: 130px;
+    gap: 15px;
+    padding: 15px;
+  }
+  
+  .chatToggleButton {
+    right: 20px;
+    bottom: 90px;
+    padding: 10px 24px;
+    font-size: 14px;
+  }
+
+  .chatInputContainer {
+    margin-bottom: 70px;
+  }
+
+  .chatSidebar {
+    width: 100%;
+  }
+
+  /* Reset position when chat is open on mobile */
+  .chatSidebar.visible ~ .chatToggleButton {
+    right: 20px;
+    bottom: 20px;
+  }
+} 
