@@ -19,6 +19,7 @@ const Navbar = () => {
         <div className={styles.navLinks}>
           <Link to="/about">About</Link>
           <Link to="/group-discussion">Group Discussion</Link>
+          <Link to="/mock-interview">Mock Interview</Link>
           <Link to="/report-bug">Report Bug</Link>
           <button 
             className={styles.contactBtn}

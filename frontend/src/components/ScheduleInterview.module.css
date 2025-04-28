@@ -1,0 +1,202 @@
+/* Container for the entire form */
+.container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 4rem 2.5rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #e0eafc, #f8fbff 60%, #dbeafe 100%);
+}
+
+/* Main title */
+.title {
+  text-align: center;
+  font-size: 3rem;
+  color: #22223b;
+  margin-bottom: 0.5rem;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+/* Subtitle */
+.subtitle {
+  text-align: center;
+  font-size: 1.3rem;
+  color: #495057;
+  margin-bottom: 2.5rem;
+}
+
+/* Form box */
+.form {
+  width: 100%;
+  background: linear-gradient(120deg, #fff 80%, #e0eafc 100%);
+  padding: 3rem 2.5rem;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px 0 rgba(60, 120, 255, 0.10), 0 1.5px 8px 0 rgba(60, 120, 255, 0.08);
+  animation: fadeIn 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Each input group */
+.formGroup {
+  margin-bottom: 2rem;
+}
+
+/* Labels */
+.formGroup label {
+  display: block;
+  margin-bottom: 0.6rem;
+  font-weight: 700;
+  color: #3730a3;
+  font-size: 1.08rem;
+  letter-spacing: 0.01em;
+}
+
+/* Inputs, selects, textareas */
+.formGroup input,
+.formGroup select,
+.formGroup textarea {
+  width: 100%;
+  padding: 1.1rem 1.2rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 14px;
+  font-size: 1.08rem;
+  background: #f9fafb;
+  color: #222;
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  box-shadow: 0 1px 4px rgba(60, 120, 255, 0.04);
+}
+
+/* Focus effect on inputs */
+.formGroup input:focus,
+.formGroup select:focus,
+.formGroup textarea:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.13);
+  background: #eef2ff;
+}
+
+/* Row layout for grouped fields */
+.formRow {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.formRow .formGroup {
+  flex: 1;
+}
+
+/* Submit button */
+.submitButton {
+  background: linear-gradient(90deg, #4f46e5 60%, #60a5fa 100%);
+  color: white;
+  padding: 1.1rem 0;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.2rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  box-shadow: 0 2px 12px 0 rgba(60, 120, 255, 0.10);
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.submitButton:hover {
+  background: linear-gradient(90deg, #4338ca 60%, #2563eb 100%);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 24px 0 rgba(60, 120, 255, 0.13);
+}
+
+.submitButton:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* Status messages */
+.statusMessage {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.success {
+  background-color: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.error {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .container {
+    padding: 2.5rem 0.5rem;
+  }
+  .form {
+    padding: 2rem 0.5rem;
+  }
+}
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem 0.2rem;
+  }
+  .form {
+    padding: 1.2rem 0.2rem;
+  }
+  .formRow {
+    flex-direction: column;
+    gap: 0;
+  }
+  .title {
+    font-size: 2.1rem;
+  }
+}
+
+.scheduleNote {
+  background-color: #f3f4f6;
+  border-left: 4px solid #4f46e5;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #374151;
+}
+
+.scheduleNote strong {
+  color: #4f46e5;
+  margin-right: 4px;
+}
+
+.maintenanceNote {
+  background-color: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #92400e;
+}
+
+.maintenanceNote strong {
+  color: #d97706;
+  margin-right: 4px;
+}

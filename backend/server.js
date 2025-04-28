@@ -4,6 +4,7 @@ import express from 'express';
 import http from 'http';
 import nodemailer from 'nodemailer';
 import { WebSocketServer } from 'ws';
+import interviewRoutes from './routes/interview.js';
 
 dotenv.config();
 
@@ -342,12 +343,21 @@ app.put('/api/rooms/participant/:roomId/:participantId', (req, res) => {
   }
 });
 
-// Create email transporter
+// Create email transporter with secure configuration
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    pass: process.env.EMAIL_APP_PASSWORD
+  }
+});
+
+// Test the email configuration on server start
+transporter.verify(function(error, success) {
+  if (error) {
+    console.error('Email configuration error:', error);
+  } else {
+    console.log('Email server is ready to send messages');
   }
 });
 
@@ -356,6 +366,11 @@ app.options('*', cors(corsOptions));
 
 app.get('/api/test', (req, res) => {
   res.json({ message: 'CORS is working' });
+});
+
+// Test endpoint to verify server is running
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Server is running' });
 });
 
 // Route to handle bug reports
@@ -383,6 +398,79 @@ app.post('/api/report-bug', async (req, res) => {
     res.status(500).json({ message: 'Failed to send bug report' });
   }
 });
+
+// Route to handle interview scheduling
+app.post('/api/schedule-interview', async (req, res) => {
+  try {
+    const { 
+      name, 
+      email, 
+      phone, 
+      preferredDate, 
+      preferredTime, 
+      collegeYear, 
+      company, 
+      message 
+    } = req.body;
+
+    console.log('Received interview request:', { name, email, preferredDate, preferredTime });
+    
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'techengfly@gmail.com',
+      subject: `New Interview Request from ${name}`,
+      text: `
+Interview Request Details:
+
+Name: ${name}
+Email: ${email}
+Phone: ${phone || 'Not provided'}
+
+Preferred Date: ${preferredDate}
+Preferred Time: ${preferredTime}
+
+College Year: ${collegeYear}
+College Name: ${company}
+
+Additional Information:
+${message || 'None provided'}
+      `,
+      html: `
+        <h2>Interview Request</h2>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
+        
+        <h3>Interview Details</h3>
+        <p><strong>Preferred Date:</strong> ${preferredDate}</p>
+        <p><strong>Preferred Time:</strong> ${preferredTime}</p>
+        
+        <h3>Candidate Information</h3>
+        <p><strong>College Year:</strong> ${collegeYear}</p>
+        <p><strong>College Name:</strong> ${company}</p>
+        
+        <h3>Additional Information</h3>
+        <p>${message || 'None provided'}</p>
+      `
+    };
+
+    console.log('Sending email with options:', mailOptions);
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully:', info.response);
+    
+    res.status(200).json({ message: 'Interview request sent successfully' });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).json({ 
+      message: 'Failed to send interview request', 
+      error: error.message
+    });
+  }
+});
+
+// Routes
+app.use('/api/interview', interviewRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
