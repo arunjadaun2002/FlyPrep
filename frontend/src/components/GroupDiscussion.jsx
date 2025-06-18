@@ -1,6 +1,5 @@
 import { JitsiMeeting } from '@jitsi/react-sdk';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FaArrowRight, FaTools } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { createRoom, getRoom, joinRoom, updateParticipant } from '../services/api';
 import { socketService } from '../services/socket';
@@ -66,29 +65,6 @@ const formatTime = (seconds) => {
 const GroupDiscussion = () => {
   const navigate = useNavigate();
 
-  // Maintenance message component
-  const MaintenanceMessage = () => (
-    <div className={styles.maintenanceContainer}>
-      <div className={styles.maintenanceCard}>
-        <FaTools className={styles.maintenanceIcon} />
-        <h1>Under Maintenance</h1>
-        <p>We're currently upgrading our Group Discussion feature to bring you an even better experience.</p>
-        <p>In the meantime, you can:</p>
-        <button 
-          className={styles.scheduleButton}
-          onClick={() => navigate('/schedule-interview')}
-        >
-          Schedule a Mock Interview
-          <FaArrowRight />
-        </button>
-        <p className={styles.estimatedTime}>Estimated completion: Coming Soon</p>
-      </div>
-    </div>
-  );
-
-  // Show maintenance message instead of the actual component
-  return <MaintenanceMessage />;
-
   const [step, setStep] = useState(1); // 1: Name, 2: Join/Create, 3: Room Setup, 4: Preparation, 5: Discussion
   const [name, setName] = useState('');
   const [roomId, setRoomId] = useState('');
@@ -128,7 +104,6 @@ const GroupDiscussion = () => {
   const [activeSpeaker, setActiveSpeaker] = useState(null);
   const [audioLevels, setAudioLevels] = useState({});
 
-  const videoRef = useRef(null);
   const streamRef = useRef(null);
 
   // Define cleanupStream first
@@ -139,9 +114,6 @@ const GroupDiscussion = () => {
         track.stop();
       });
       streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
     }
     setLocalStream(null);
     setIsStreamInitialized(false);
@@ -201,27 +173,11 @@ const GroupDiscussion = () => {
         streamRef.current = stream;
         setLocalStream(stream);
         
-        // Set the stream to the video element
-        if (videoRef.current) {
-          console.log('Setting stream to video element');
-          videoRef.current.srcObject = stream;
-          videoRef.current.muted = false;
-          
-          try {
-            await videoRef.current.play();
-            console.log('Video playing successfully');
-            setIsStreamInitialized(true);
-            setIsCameraOn(true);
-            setIsMicOn(true);
-            setStreamError(null);
-          } catch (err) {
-            console.error('Error playing video:', err);
-            setStreamError(err.message);
-          }
-        } else {
-          console.error('Video element not found');
-          setStreamError('Video element not found');
-        }
+        // Stream is ready for Jitsi Meet
+        setIsStreamInitialized(true);
+        setIsCameraOn(true);
+        setIsMicOn(true);
+        setStreamError(null);
       } catch (error) {
         console.error('Error setting up stream:', error);
         setStreamError(error.message);

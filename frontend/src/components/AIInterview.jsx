@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { FaArrowRight, FaTools } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { aiInterviewService } from '../services/aiInterview';
 import styles from './AIInterview.module.css';
@@ -109,29 +108,6 @@ const AIInterview = () => {
     setInterviewSummary(null);
     setInterviewStarted(false);
   };
-
-  // Maintenance message component
-  const MaintenanceMessage = () => (
-    <div className={styles.maintenanceContainer}>
-      <div className={styles.maintenanceCard}>
-        <FaTools className={styles.maintenanceIcon} />
-        <h1>Under Maintenance</h1>
-        <p>We're currently upgrading our AI Interview feature to bring you an even better experience.</p>
-        <p>In the meantime, you can:</p>
-        <button 
-          className={styles.scheduleButton}
-          onClick={() => navigate('/schedule-interview')}
-        >
-          Schedule a Mock Interview
-          <FaArrowRight />
-        </button>
-        <p className={styles.estimatedTime}>Estimated completion: Coming Soon</p>
-      </div>
-    </div>
-  );
-
-  // Show maintenance message instead of the actual component
-  return <MaintenanceMessage />;
 
   return (
     <div className={styles.container}>

@@ -86,7 +86,7 @@ wss.on('connection', (ws, req) => {
 
 // CORS configuration
 const corsOptions = {
-  origin: ['https://flyprep-frontend.onrender.com', 'http://localhost:5000', 'http://localhost:3000'],
+  origin: ['https://flyprep-frontend.onrender.com', 'http://localhost:5000', 'http://localhost:3000', 'http://localhost:3001'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
